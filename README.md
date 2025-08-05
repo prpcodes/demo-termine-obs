@@ -10,6 +10,7 @@
      - Column B: Location
      - Column C: Date/Time
 2. **Google Apps Script**:
+   - Download this repository: [main.zip]( https://github.com/prpcodes/demo-termine-obs/archive/refs/heads/main.zip)
    - Open the Google Apps Script editor from the Google Sheet.
    - Replace the default code with the provided `Code.gs` content.
    - Replace `SPREAD_SHEET_ID` in the `Code.gs` file with your copied Google Sheet ID.
