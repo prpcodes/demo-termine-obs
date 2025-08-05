@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demonstrationstermine</title>
+    <style>
+        body {
+            font-family: 'Cambria';
+        }
+
+        .marquee {
+            overflow: hidden;
+            display: flex;
+            padding: 15px 0;
+        }
+
+        .marquee-content {
+            font-size: 60px;
+            white-space: nowrap;
+            font-weight: 400;
+            font-family: 'Cambria';
+            font-style: italic;
+            color: white;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="marquee" id="marquee">
+        <div class="marquee-content" id="marquee-content"></div>
+    </div>
+
+    <script>
+        const marqueeContainer = document.getElementById('marquee');
+        const marqueeContent = document.getElementById('marquee-content');
+
+        const APPS_SCRIPT_URL = 'YOUR_WEB_APP_URL';
+
+        let events = [];
+        let marqueeSpeed = 0.5; // pixels per frame
+        let animationId;
+
+        function initMarquee() {
+            const firstElement = marqueeContainer.children[0];
+            const clone = marqueeContainer.innerHTML;
+            let i = 0;
+
+            // Add clones for seamless loop
+            marqueeContainer.insertAdjacentHTML('beforeend', clone);
+            marqueeContainer.insertAdjacentHTML('beforeend', clone);
+
+            function animate() {
+                firstElement.style.marginLeft = `-${i}px`;
+                if (i > firstElement.clientWidth) {
+                    i = 0;
+                }
+                i = i + marqueeSpeed;
+                animationId = requestAnimationFrame(animate);
+            }
+
+            animate();
+        }
+
+        function stopMarquee() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+        }
+
+        function restartMarquee() {
+            stopMarquee();
+            // Clear clones, keep only original content
+            while (marqueeContainer.children.length > 1) {
+                marqueeContainer.removeChild(marqueeContainer.lastChild);
+            }
+            marqueeContainer.children[0].style.marginLeft = '0px';
+            initMarquee();
+        }
+
+        async function fetchEventsFromSheet() {
+            try {
+                const response = await fetch(APPS_SCRIPT_URL);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.events && data.events.length > 0) {
+                    events = [];
+
+                    data.events.forEach(eventItem => {
+                        if (typeof eventItem === 'string') {
+                            if (eventItem.trim() !== '') {
+                                events.push(eventItem.trim());
+                            }
+                        } else if (typeof eventItem === 'object') {
+                            const name = eventItem.name?.trim() || '';
+                            const datetime = eventItem.datetime || '';
+                            const location = eventItem.location?.trim() || '';
+
+                            let formattedDate = '';
+                            let formattedTime = '';
+
+                            // Format datetime to German format (DD.MM) and time (HH:MM)
+                            if (datetime && datetime !== '') {
+                                try {
+                                    const dateObj = new Date(datetime);
+                                    if (!isNaN(dateObj.getTime())) {
+                                        const day = dateObj.getDate().toString().padStart(2, '0');
+                                        const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+                                                          'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+                                        const dayNames = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                                        const month = monthNames[dateObj.getMonth()];
+                                        const dayOfWeek = dayNames[dateObj.getDay()];
+                                        const hours = dateObj.getHours().toString().padStart(2, '0');
+                                        const minutes = dateObj.getMinutes().toString().padStart(2, '0');
+
+                                        formattedDate = `${day}. ${month} - ${dayOfWeek}`;
+
+                                        // Only add time if it's not midnight
+                                        if (hours !== '00' || minutes !== '00') {
+                                            formattedTime = `${hours}:${minutes}`;
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.log('DateTime parsing failed for:', datetime);
+                                }
+                            }
+
+                            if (name) {
+                                eventText = `${formattedDate}: ${name} - ${location} - ${formattedTime} Uhr`;
+                                events.push(eventText);
+                            }
+                        }
+                    });
+
+                    // Filter out empty events
+                    events = events.filter(event => event.trim() !== '');
+
+                    if (events.length > 0) {
+                        updateEvents(events);
+                    } else {
+                        marqueeContent.textContent = 'No valid events found in the sheet.';
+                        restartMarquee();
+                    }
+                } else {
+                    marqueeContent.textContent = 'No events found in the sheet.';
+                    restartMarquee();
+                }
+
+            } catch (error) {
+                console.error('Error fetching events:', error);
+                marqueeContent.textContent = 'Error loading events from Google Sheets.';
+                restartMarquee();
+            }
+        }
+
+        // Function to update events display
+        function updateEvents(eventArray) {
+            if (eventArray.length === 0) {
+                marqueeContent.textContent = 'No events scheduled.';
+                restartMarquee();
+                return;
+            }
+
+            const eventText = eventArray.join(' || ');
+            marqueeContent.textContent = eventText;
+            restartMarquee();
+        }
+
+        function addEvent(newEvent) {
+            events.push(newEvent);
+            updateEvents(events);
+        }
+
+        function removeEvent(index) {
+            events.splice(index, 1);
+            updateEvents(events);
+        }
+
+        function changeSpeed(speed) {
+            marqueeSpeed = speed;
+        }
+
+        function refreshEvents() {
+            fetchEventsFromSheet();
+        }
+
+        setInterval(refreshEvents, 300000);
+
+        window.addEventListener('load', () => {
+            fetchEventsFromSheet();
+        });
+    </script>
+</body>
+</html>
